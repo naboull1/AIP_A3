@@ -1,100 +1,100 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerPlaneController : MonoBehaviour
 {
     [Header("Movement Settings")]
-    [SerializeField] private float acceleration = 15f;        // how fast we speed up when pressing keys
-    [SerializeField] private float maxSpeed = 10f;            // cap on how fast we can go
-    [SerializeField] private float friction = 5f;             // slows us down when not pressing anything
-    [SerializeField] private float constantForwardSpeed = 4f; // auto-move to the right
+    [SerializeField] private float baseForwardSpeed = 8f;     // constant speed to the right
+    [SerializeField] private float strafeAcceleration = 30f;  // how quickly input changes your extra velocity
+    [SerializeField] private float maxStrafeSpeed = 10f;      // max extra speed from input/dash
+    [SerializeField] private float velocityDrag = 5f;         // how quickly extra velocity fades when not holding input
 
     [Header("Dash Settings")]
-    [SerializeField] private float dashBoost = 15f;           // how strong the dash impulse is
-    [SerializeField] private float dashCooldown = 1.0f;       // time between dashes in seconds
+    [SerializeField] private float dashBoost = 15f;           // strength of dash impulse
+    [SerializeField] private float dashCooldown = 1.0f;       // seconds between dashes
 
-    private Vector2 velocity;            // our manual velocity (no Rigidbody)
-    private float dashCooldownTimer = 0; // counts down after a dash
+    [Header("Collision Settings")]
+    [SerializeField] private float collisionRadius = 0.6f;    // approximate size of player for collisions
+
+    [Header("Score")]
+    [SerializeField] private int scorePerCollectible = 10;
+    private int score = 0;
 
     [Header("Shooting Settings")]
     [SerializeField] private GameObject projectilePrefab;
     [SerializeField] private float projectileSpeed = 20f;
     [SerializeField] private float fireCooldown = 0.2f;
 
+    private Vector2 velocity;            // extra velocity controlled by player/dash
+    private Vector3 spawnPosition;       // where we respawn on death
+
+    private float dashCooldownTimer = 0f;
     private float fireCooldownTimer = 0f;
 
+    private void Awake()
+    {
+        spawnPosition = transform.position;
+    }
 
     private void Update()
     {
         float dt = Time.deltaTime;
 
-        // --- COOLDOWN TIMER ---
+        // --- Update cooldown timers ---
         if (dashCooldownTimer > 0f)
-        {
             dashCooldownTimer -= dt;
-        }
 
-        // 1. Read input
+        if (fireCooldownTimer > 0f)
+            fireCooldownTimer -= dt;
+
+        // --- Read input ---
         float horizontal = Input.GetAxisRaw("Horizontal"); // A/D or Left/Right
         float vertical = Input.GetAxisRaw("Vertical");   // W/S or Up/Down
         Vector2 inputDir = new Vector2(horizontal, vertical).normalized;
 
-        // 2. Apply acceleration from input
-        Vector2 accel = inputDir * acceleration;
+        // --- Apply strafe acceleration based on input ---
+        // This only affects the "extra" velocity, not the base forward speed
+        velocity += inputDir * strafeAcceleration * dt;
 
-        // 3. Add a constant push to the right ONLY if you're not holding left
-        if (horizontal >= 0f)
-        {
-            accel += Vector2.right * constantForwardSpeed;
-        }
-
-
-
-        // 4. Integrate velocity: v = v + a * dt
-        velocity += accel * dt;
-
-        // 5. Apply friction when there's little/no input so it doesn't drift forever
+        // --- Apply drag when not really steering ---
         if (inputDir.sqrMagnitude < 0.01f)
         {
-            // move velocity toward zero over time
-            velocity = Vector2.MoveTowards(velocity, Vector2.zero, friction * dt);
+            // Pull extra velocity back toward zero over time
+            velocity = Vector2.MoveTowards(velocity, Vector2.zero, velocityDrag * dt);
         }
 
-        // --- DASH INPUT ---
+        // --- Dash (adds a burst into velocity) ---
         HandleDash(inputDir);
 
-        // 6. Clamp max speed (after dash too)
-        if (velocity.magnitude > maxSpeed)
+        // --- Clamp extra velocity so it doesn't get insane ---
+        if (velocity.magnitude > maxStrafeSpeed)
         {
-            velocity = velocity.normalized * maxSpeed;
+            velocity = velocity.normalized * maxStrafeSpeed;
         }
 
-        // 7. Integrate position: p = p + v * dt
+        // --- Move the plane ---
+        // Always move forward at baseForwardSpeed, plus any extra velocity
+        Vector2 move = new Vector2(baseForwardSpeed, 0f) + velocity;
         Vector3 pos = transform.position;
-        pos += (Vector3)(velocity * dt);
+        pos += (Vector3)(move * dt);
         transform.position = pos;
 
-        // --- FIRE COOLDOWN TIMER ---
-        if (fireCooldownTimer > 0f)
-        {
-            fireCooldownTimer -= dt;
-        }
+        // --- Collisions ---
+        CheckCollisionWithObstacles();
+        CheckCollisionWithCollectibles();
+        CheckCollisionWithBoss();
 
-        // --- SHOOTING INPUT ---
+        // --- Shooting ---
         HandleShooting();
-
     }
 
     private void HandleDash(Vector2 inputDir)
     {
-        // Only dash when cooldown is ready and Space is pressed
         if (dashCooldownTimer > 0f)
             return;
 
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            // Decide dash direction:
-            // - If player is pressing a direction, dash that way
-            // - Otherwise, default to the right (forward)
             Vector2 dashDir;
 
             if (inputDir.sqrMagnitude > 0.01f)
@@ -106,33 +106,113 @@ public class PlayerPlaneController : MonoBehaviour
                 dashDir = Vector2.right; // default forward dash
             }
 
-            // Apply an instant boost to velocity
+            // Add an instant burst to extra velocity
             velocity += dashDir * dashBoost;
 
-            // Start cooldown
             dashCooldownTimer = dashCooldown;
         }
     }
 
     private void HandleShooting()
     {
-        // Only fire when cooldown ready
         if (fireCooldownTimer > 0f)
             return;
 
-        // Left mouse OR Ctrl OR F key
-        if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.F))
+        if (Input.GetMouseButtonDown(0) ||
+            Input.GetKeyDown(KeyCode.LeftControl) ||
+            Input.GetKeyDown(KeyCode.F))
         {
-            // Create projectile
             GameObject proj = Instantiate(projectilePrefab, transform.position, Quaternion.identity);
-
-            // Get projectile script and assign manual velocity
             Projectile p = proj.GetComponent<Projectile>();
             p.velocity = Vector2.right * projectileSpeed;
 
-            // Reset cooldown
             fireCooldownTimer = fireCooldown;
         }
     }
 
+    private void CheckCollisionWithObstacles()
+    {
+        foreach (Obstacle obstacle in Obstacle.AllObstacles)
+        {
+            if (obstacle == null) continue;
+
+            float dist = Vector2.Distance(transform.position, obstacle.transform.position);
+
+            if (dist <= collisionRadius + obstacle.radius)
+            {
+                OnHitObstacle(obstacle);
+                break;
+            }
+        }
+    }
+
+    private void OnHitObstacle(Obstacle obstacle)
+    {
+        Debug.Log("Player hit obstacle: " + obstacle.name);
+
+        transform.position = spawnPosition;
+        velocity = Vector2.zero;
+    }
+
+    private void CheckCollisionWithCollectibles()
+    {
+        for (int i = Collectible.AllCollectibles.Count - 1; i >= 0; i--)
+        {
+            Collectible c = Collectible.AllCollectibles[i];
+            if (c == null) continue;
+
+            float dist = Vector2.Distance(transform.position, c.transform.position);
+
+            if (dist <= collisionRadius + c.radius)
+            {
+                OnCollect(c);
+            }
+        }
+    }
+
+    private void OnCollect(Collectible c)
+    {
+        score += scorePerCollectible;
+        Debug.Log($"Collected {c.name}. Score = {score}");
+
+        Destroy(c.gameObject);
+    }
+
+    private void CheckCollisionWithBoss()
+    {
+        foreach (Boss boss in Boss.AllBosses)
+        {
+            if (boss == null) continue;
+
+            float dist = Vector2.Distance(transform.position, boss.transform.position);
+
+            if (dist <= collisionRadius + boss.radius)
+            {
+                OnHitBoss(boss);
+                break;
+            }
+        }
+    }
+
+    private void OnHitBoss(Boss boss)
+    {
+        Debug.Log($"Reached boss! Current score = {score}, required = {boss.requiredScoreToDefeat}");
+
+        if (score >= boss.requiredScoreToDefeat)
+        {
+            Debug.Log("You defeated the boss! YOU WIN!");
+            ReloadCurrentScene();
+        }
+        else
+        {
+            Debug.Log("Not enough score. Boss destroys you. GAME OVER.");
+            ReloadCurrentScene();
+        }
+    }
+
+    private void ReloadCurrentScene()
+    {
+        Scene current = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(current.buildIndex);
+    }
 }
