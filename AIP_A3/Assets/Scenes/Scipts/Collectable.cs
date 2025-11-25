@@ -9,6 +9,7 @@ public class Collectible : MonoBehaviour
     // Keep track of all active collectibles
     public static List<Collectible> AllCollectibles = new List<Collectible>();
 
+    //add collectible to list
     private void OnEnable()
     {
         if (!AllCollectibles.Contains(this))
@@ -22,6 +23,7 @@ public class Collectible : MonoBehaviour
         AllCollectibles.Remove(this);
     }
 
+    //visual aid for radius in scene
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;

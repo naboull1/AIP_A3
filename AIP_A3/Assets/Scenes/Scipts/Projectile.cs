@@ -16,15 +16,15 @@ public class Projectile : MonoBehaviour
     {
         float dt = Time.deltaTime;
 
-        // 1. Move the projectile using manual physics
+        //move projectile 
         Vector3 pos = transform.position;
         pos += (Vector3)(velocity * dt);
         transform.position = pos;
 
-        // 2. Check for collision with any obstacle
+        //Check for collision with any obstacle
         CheckCollisionWithObstacles();
 
-        // 3. Count down lifetime
+        //destroy after time
         timer += dt;
         if (timer >= lifetime)
         {
@@ -42,13 +42,13 @@ public class Projectile : MonoBehaviour
             // Distance between projectile and obstacle centres
             float dist = Vector2.Distance(transform.position, obstacle.transform.position);
 
-            // If distance is less than sum of radii, they overlap
+            // If distance is less than sum of radius, they overlap
             if (dist <= hitRadius + obstacle.radius)
             {
                 // Destroy both projectile and obstacle
                 Destroy(obstacle.gameObject);
                 Destroy(gameObject);
-                break; // exit the loop, this projectile is gone
+                break;
             }
         }
     }

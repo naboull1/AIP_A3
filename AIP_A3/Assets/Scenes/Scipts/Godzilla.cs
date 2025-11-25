@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class Boss : MonoBehaviour
@@ -6,21 +6,25 @@ public class Boss : MonoBehaviour
     [Header("Collision Settings")]
     [SerializeField] public float radius = 1.0f;  // approximate boss size
 
+    //amount of collectibles needed to win against the boss
     [Header("Win Condition")]
     [SerializeField] public int requiredScoreToDefeat = 50;
 
+    
     [Header("Homing Laser Settings")]
-    [SerializeField] private Transform player;             // assign in Inspector
-    [SerializeField] private GameObject homingLaserPrefab; // assign in Inspector
-    [SerializeField] private float fireInterval = 2.0f;    // seconds between shots
-    [SerializeField] private float activationX = 20f;      // player.x at which boss starts firing
+    [SerializeField] private Transform player;             // slot for player
+    [SerializeField] private GameObject homingLaserPrefab; // slot for laster prefab
+    [SerializeField] private float fireInterval = 2.0f;    // how often boss shoots lasers
+    [SerializeField] private float activationX = 20f;      // distance of player.x at which boss starts firing
 
+    //fire time and number of shots fired for stats
     private float fireTimer = 0f;
     private int shotsFired = 0;
     private bool hasActivated = false;
 
-    // Keep track of all bosses for player collision logic
+    // keep track of all bosses for player collision logic
     public static List<Boss> AllBosses = new List<Boss>();
+
 
     private void OnEnable()
     {
@@ -35,6 +39,7 @@ public class Boss : MonoBehaviour
         AllBosses.Remove(this);
     }
 
+
     private void Start()
     {
         Debug.Log("Boss Start() called");
@@ -43,7 +48,7 @@ public class Boss : MonoBehaviour
         activationX = transform.position.x - 3f;
         Debug.Log($"Boss activationX automatically set to {activationX}");
 
-        // Player assignment
+        // Player assignment debugging and checking 
         if (player == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
@@ -69,7 +74,7 @@ public class Boss : MonoBehaviour
         if (player == null)
             return;
 
-        // Only start firing once the player reaches activationX
+        // fires when player is in range
         if (player.position.x < activationX)
             return;
 
@@ -83,7 +88,7 @@ public class Boss : MonoBehaviour
     }
 
 
-
+    //function for firing lasers
     private void FireHomingLaser()
     {
         if (homingLaserPrefab == null)
@@ -91,26 +96,20 @@ public class Boss : MonoBehaviour
             Debug.LogWarning("Boss has no HomingLaser prefab assigned!");
             return;
         }
-
-        // Slight random offset so they don't stack perfectly
+        //position calculations
         Vector3 spawnPos = transform.position;
         spawnPos += new Vector3(Random.Range(-0.3f, 0.3f), Random.Range(-0.3f, 0.3f), 0f);
-
+        //spawns a laser
         GameObject laserObj = Instantiate(homingLaserPrefab, spawnPos, Quaternion.identity);
 
         HomingLaser laser = laserObj.GetComponent<HomingLaser>();
         if (laser != null && player != null)
         {
-            laser.Init(player);
+            laser.Init(player);   // ⬅ this is the ONLY target assignment now
         }
-
+        //updates shot count
         shotsFired++;
         Debug.Log($"Boss fired homing laser #{shotsFired} at time {Time.time}");
     }
 
-    private void OnDrawGizmosSelected()
-    {
-        Gizmos.color = Color.magenta;
-        Gizmos.DrawWireSphere(transform.position, radius);
-    }
 }

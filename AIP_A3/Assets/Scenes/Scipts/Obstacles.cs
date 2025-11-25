@@ -24,7 +24,7 @@ public class Obstacle : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        // Just for debugging: shows the collision radius in the editor
+        // visual aid for editor
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, radius);
     }

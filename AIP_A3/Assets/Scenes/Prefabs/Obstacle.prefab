@@ -103,4 +103,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c3726d8a03ea1ef498e6beba6b4b5374, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Obstacle
-  radius: 0.5
+  radius: 0.3
